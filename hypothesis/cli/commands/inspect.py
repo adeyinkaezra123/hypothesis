@@ -6,18 +6,15 @@ from pathlib import Path
 from typing import Annotated
 
 import typer
-from rich.console import Console
 from sqlalchemy import create_engine
 from sqlalchemy.exc import SQLAlchemyError
 
-from hypothesis.cli.output import render_json, render_markdown, render_table
+from hypothesis.cli.output import render_json, render_markdown, render_schema_overview, render_table
+from hypothesis.cli.theme import console, error_console, error_message, status
 from hypothesis.core.connection_builder import build_connection_string
 from hypothesis.core.exceptions import HypothesisError
 from hypothesis.core.inspector import SchemaInspector
 from hypothesis.mapping.classifier import ColumnClassifier
-
-console = Console()
-error_console = Console(stderr=True)
 
 _FORMATS = ("table", "json", "markdown")
 
@@ -58,7 +55,10 @@ def inspect_command(
     """Inspect a database schema and display its tables, columns, and relationships."""
     if output_format not in _FORMATS:
         error_console.print(
-            f"[red]Invalid --format '{output_format}'.[/red] Choose from: {', '.join(_FORMATS)}."
+            error_message(
+                f"Invalid --format '{output_format}'.",
+                f"Choose from: {', '.join(_FORMATS)}.",
+            )
         )
         raise typer.Exit(code=2)
 
@@ -72,11 +72,11 @@ def inspect_command(
         finally:
             engine.dispose()
     except (HypothesisError, SQLAlchemyError, ValueError) as exc:
-        error_console.print(f"[red]Error:[/red] {exc}")
+        error_console.print(error_message("Could not inspect database.", str(exc)))
         raise typer.Exit(code=1) from exc
 
     if not schema_tables:
-        console.print("[yellow]No tables found in the database.[/yellow]")
+        console.print(status("No tables found", "database reflected successfully", style="warning"))
         return
 
     classifications = ColumnClassifier().classify_schema(schema_tables)
@@ -89,11 +89,13 @@ def inspect_command(
         print(render_markdown(schema_tables, classifications))
         return
 
+    render_schema_overview(schema_tables, classifications, console=console)
+    console.print()
     render_table(schema_tables, console=console, verbose=verbose, classifications=classifications)
     console.print()
     cycles = graph.detect_cycles()
     if cycles:
         joined = "; ".join(" ↔ ".join(cycle) for cycle in cycles)
-        console.print(f"[yellow]Circular foreign-key dependencies detected:[/yellow] {joined}")
+        console.print(status("Circular dependencies", joined, style="warning"))
     else:
-        console.print(f"[bold]Insertion order:[/bold] {' → '.join(graph.topological_sort())}")
+        console.print(status("Insertion order", " → ".join(graph.topological_sort())))

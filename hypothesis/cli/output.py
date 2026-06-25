@@ -24,6 +24,22 @@ from hypothesis.mapping.types import ClassificationResult
 ClassificationMap = dict[str, dict[str, ClassificationResult]]
 
 
+def _schema_counts(
+    tables: list[TableSchema], classifications: ClassificationMap | None
+) -> tuple[int, int, int, int]:
+    columns = sum(len(table.columns) for table in tables)
+    foreign_keys = sum(len(table.foreign_keys) for table in tables)
+    low_confidence = 0
+    if classifications:
+        low_confidence = sum(
+            1
+            for table_results in classifications.values()
+            for result in table_results.values()
+            if result.needs_review
+        )
+    return len(tables), columns, foreign_keys, low_confidence
+
+
 def _constraint_flags(col: ColumnSchema) -> str:
     """Compact human-readable constraint summary for a column."""
     flags: list[str] = []
@@ -58,6 +74,31 @@ def _semantic_cell(result: ClassificationResult | None, *, markup: bool) -> str:
     return f"{result.semantic_type.value} {indicator}"
 
 
+def render_schema_overview(
+    tables: list[TableSchema],
+    classifications: ClassificationMap | None = None,
+    *,
+    console: Console | None = None,
+) -> None:
+    """Render a compact schema summary before table detail."""
+    console = console or Console()
+    table_count, column_count, fk_count, low_confidence = _schema_counts(tables, classifications)
+    overview = Table.grid(expand=False, padding=(0, 2))
+    overview.add_column(style="bold cyan")
+    overview.add_column(style="bold white", justify="right")
+    overview.add_column(style="dim")
+    overview.add_row("Tables", str(table_count), "reflected")
+    overview.add_row("Columns", str(column_count), "available for classification")
+    overview.add_row("Foreign keys", str(fk_count), "used for dependency order")
+    overview.add_row(
+        "Review",
+        str(low_confidence),
+        "low-confidence columns" if low_confidence else "no low-confidence columns",
+    )
+    console.print("[heading]Schema overview[/heading]")
+    console.print(overview)
+
+
 def render_table(
     tables: list[TableSchema],
     *,
@@ -70,13 +111,17 @@ def render_table(
     show_semantic = classifications is not None
     for table in tables:
         results = classifications.get(table.name, {}) if classifications else {}
-        rich_table = Table(title=_qualified_name(table), title_justify="left")
+        rich_table = Table(
+            title=_qualified_name(table),
+            title_justify="left",
+            header_style="bold cyan",
+        )
         rich_table.add_column("Column", style="cyan", no_wrap=True)
         rich_table.add_column("Type", style="green")
         rich_table.add_column("Null", justify="center")
         rich_table.add_column("Constraints", style="yellow")
         if show_semantic:
-            rich_table.add_column("Semantic", style="magenta")
+            rich_table.add_column("Semantic")
         for col in table.columns:
             cells = [
                 col.name,

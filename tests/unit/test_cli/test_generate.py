@@ -65,7 +65,9 @@ def test_generated_foreign_keys_are_valid(db_url: str) -> None:
 
 
 def test_tables_filter_limits_generation(db_url: str) -> None:
-    result = runner.invoke(app, ["generate", db_url, "--tables", "users", "--rows", "5", "--seed", "1"])
+    result = runner.invoke(
+        app, ["generate", db_url, "--tables", "users", "--rows", "5", "--seed", "1"]
+    )
     assert result.exit_code == 0, result.output
     assert _scalar(db_url, "SELECT COUNT(*) FROM users") == 5
     assert _scalar(db_url, "SELECT COUNT(*) FROM posts") == 0
@@ -77,14 +79,18 @@ def test_seed_makes_generation_reproducible(tmp_path: Path) -> None:
         engine = create_engine(url)
         with engine.begin() as conn:
             conn.execute(
-                text("CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, email VARCHAR(255) NOT NULL)")
+                text(
+                    "CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, email VARCHAR(255) NOT NULL)"
+                )
             )
         engine.dispose()
         assert runner.invoke(app, ["generate", url, "--rows", "3", "--seed", "42"]).exit_code == 0
         engine = create_engine(url)
         try:
             with engine.connect() as conn:
-                return str(conn.execute(text("SELECT email FROM users ORDER BY id LIMIT 1")).scalar())
+                return str(
+                    conn.execute(text("SELECT email FROM users ORDER BY id LIMIT 1")).scalar()
+                )
         finally:
             engine.dispose()
 
