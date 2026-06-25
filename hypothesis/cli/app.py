@@ -8,6 +8,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.traceback import install as install_rich_traceback
 
+from hypothesis.cli.commands.generate import generate_command
 from hypothesis.cli.commands.inspect import inspect_command
 from hypothesis.utils.logging import setup_logging_with_redaction
 
@@ -63,6 +64,7 @@ def common_options(
 
 
 app.command(name="inspect")(inspect_command)
+app.command(name="generate")(generate_command)
 
 
 def main() -> None:
