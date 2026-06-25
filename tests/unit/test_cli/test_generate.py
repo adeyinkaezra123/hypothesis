@@ -99,3 +99,22 @@ def test_invalid_rows_exits_2(db_url: str) -> None:
 def test_malformed_connection_exits_1() -> None:
     result = runner.invoke(app, ["generate", "://nonsense", "--rows", "5"])
     assert result.exit_code == 1
+
+
+def test_unique_space_exhaustion_stops_gracefully(tmp_path: Path) -> None:
+    url = f"sqlite:///{tmp_path / 'labels.db'}"
+    engine = create_engine(url)
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "CREATE TABLE labels ("
+                "id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                "kind VARCHAR(10) NOT NULL CHECK (kind IN ('a', 'b')))"
+            )
+        )
+        conn.execute(text("CREATE UNIQUE INDEX ux_labels_kind ON labels(kind)"))
+    engine.dispose()
+    # Only two distinct unique values exist; asking for 10 must not abort.
+    result = runner.invoke(app, ["generate", url, "--rows", "10", "--seed", "1"])
+    assert result.exit_code == 0, result.output
+    assert _scalar(url, "SELECT COUNT(*) FROM labels") <= 2

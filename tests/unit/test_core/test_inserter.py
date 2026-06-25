@@ -66,3 +66,14 @@ def test_insert_table_skips_failing_batch_and_continues(engine: Engine) -> None:
     assert result.rows_skipped == 1
     assert result.errors
     assert _count(engine) == 2
+
+
+def test_failing_row_in_a_batch_only_skips_that_row(engine: Engine) -> None:
+    # One bad row in a multi-row batch: the good rows still land (per-row retry).
+    inserter = BulkInserter(engine, batch_size=10)
+    rows: list[dict[str, Any]] = [{"email": "a@x.com"}, {"email": None}, {"email": "c@x.com"}]
+    result = inserter.insert_table("users", iter(rows), total_rows=3)
+
+    assert result.rows_inserted == 2
+    assert result.rows_skipped == 1
+    assert _count(engine) == 2

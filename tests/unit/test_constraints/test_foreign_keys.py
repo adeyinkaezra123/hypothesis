@@ -59,3 +59,11 @@ def test_empty_parent_raises(engine: Engine) -> None:
 def test_sample_size_limits_cache(engine: Engine) -> None:
     resolver = ForeignKeyResolver(engine, sample_size=2)
     assert len(resolver.cache_parent_ids("users", "id")) == 2
+
+
+def test_seed_makes_selection_deterministic(engine: Engine) -> None:
+    first = ForeignKeyResolver(engine, seed=7)
+    second = ForeignKeyResolver(engine, seed=7)
+    picks_first = [first.select_fk_value("users", "id") for _ in range(12)]
+    picks_second = [second.select_fk_value("users", "id") for _ in range(12)]
+    assert picks_first == picks_second

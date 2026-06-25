@@ -3,8 +3,9 @@
 from typing import Any
 
 from hypothesis.constraints.unique import UniqueConstraintHandler
+from hypothesis.core.exceptions import ForeignKeyError
 from hypothesis.core.generator import DataGenerator
-from hypothesis.core.models import ColumnSchema, TableSchema
+from hypothesis.core.models import ColumnSchema, ForeignKey, TableSchema
 from hypothesis.mapping.classifier import ColumnClassifier
 
 _classifier = ColumnClassifier()
@@ -21,13 +22,49 @@ def test_generate_value_for_email() -> None:
     assert "@" in DataGenerator(seed=1).generate_value(cls)
 
 
-def test_generate_value_for_foreign_key_uses_cache() -> None:
-    col = ColumnSchema(
-        name="user_id", table_name="posts", sql_type="INTEGER", python_type=int, is_foreign_key=True
+class _FixedFkSource:
+    """A fake FkValueSource returning a constant value (no DB needed)."""
+
+    def __init__(self, value: Any) -> None:
+        self.value = value
+
+    def select_fk_value(
+        self, parent_table: str, parent_column: str, distribution: str = "uniform"
+    ) -> Any:
+        return self.value
+
+
+class _EmptyFkSource:
+    """A fake FkValueSource that reports an empty parent pool."""
+
+    def select_fk_value(
+        self, parent_table: str, parent_column: str, distribution: str = "uniform"
+    ) -> Any:
+        raise ForeignKeyError("no parent rows")
+
+
+def _posts_with_fk(*, nullable: bool) -> TableSchema:
+    return TableSchema(
+        name="posts",
+        columns=[
+            ColumnSchema("user_id", "posts", "INTEGER", int, is_foreign_key=True, nullable=nullable)
+        ],
+        foreign_keys=[ForeignKey("posts", "user_id", "users", "id")],
     )
-    cls = _classifier.classify_column(col)
-    value = DataGenerator(seed=1).generate_value(cls, fk_cache={"posts.user_id": [10, 20, 30]})
-    assert value in {10, 20, 30}
+
+
+def test_foreign_key_value_comes_from_the_source() -> None:
+    table = _posts_with_fk(nullable=False)
+    classifications = _classifier.classify_table(table)
+    row = DataGenerator(seed=1).generate_row(table, classifications, fk_source=_FixedFkSource(42))
+    assert row["user_id"] == 42
+
+
+def test_nullable_foreign_key_with_empty_parent_is_null() -> None:
+    table = _posts_with_fk(nullable=True)
+    classifications = _classifier.classify_table(table)
+    row = DataGenerator(seed=1).generate_row(table, classifications, fk_source=_EmptyFkSource())
+    assert row["user_id"] is None
 
 
 def test_generate_value_for_enum_uses_schema_values() -> None:

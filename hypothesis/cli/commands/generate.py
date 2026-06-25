@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -23,12 +23,13 @@ from sqlalchemy.exc import SQLAlchemyError
 from hypothesis.constraints.foreign_keys import ForeignKeyResolver
 from hypothesis.constraints.unique import UniqueConstraintHandler
 from hypothesis.core.connection_builder import build_connection_string
-from hypothesis.core.exceptions import HypothesisError
+from hypothesis.core.exceptions import HypothesisError, UniqueConstraintError
 from hypothesis.core.generator import DataGenerator
 from hypothesis.core.inserter import BulkInserter, InsertionResult
 from hypothesis.core.inspector import SchemaInspector
 from hypothesis.core.models import TableSchema
 from hypothesis.mapping.classifier import ColumnClassifier
+from hypothesis.mapping.types import ClassificationResult
 
 console = Console()
 error_console = Console(stderr=True)
@@ -40,14 +41,24 @@ def _resolve_connection(database: str, config: Path | None) -> str:
     return build_connection_string(database_name=database, config_file=config)
 
 
-def _build_fk_cache(table: TableSchema, resolver: ForeignKeyResolver) -> dict[str, list[Any]]:
-    """Cache valid parent ids for each foreign key (parents are inserted first)."""
-    cache: dict[str, list[Any]] = {}
-    for fk in table.foreign_keys:
-        cache[f"{table.name}.{fk.column}"] = resolver.cache_parent_ids(
-            fk.referenced_table, fk.referenced_column
-        )
-    return cache
+def _row_stream(
+    generator: DataGenerator,
+    table: TableSchema,
+    classifications: dict[str, ClassificationResult],
+    fk_source: ForeignKeyResolver,
+    unique_handler: UniqueConstraintHandler,
+    rows: int,
+) -> Iterator[dict[str, Any]]:
+    """Yield generated rows, stopping early if the unique value space runs out.
+
+    Requesting more rows than a unique column has distinct values ends that
+    table gracefully with fewer rows rather than aborting the whole run.
+    """
+    for _ in range(rows):
+        try:
+            yield generator.generate_row(table, classifications, fk_source, unique_handler)
+        except UniqueConstraintError:
+            break
 
 
 def _make_progress() -> Progress:
@@ -132,19 +143,17 @@ def generate_command(
 
         generator = DataGenerator(faker_locale=locale, seed=seed)
         inserter = BulkInserter(engine, batch_size=batch_size)
-        resolver = ForeignKeyResolver(engine)
+        resolver = ForeignKeyResolver(engine, seed=seed)
 
         results: list[InsertionResult] = []
         with _make_progress() as progress:
             for table_name in insertion_order:
                 table = schema_tables[table_name]
                 table_classifications = classifications[table_name]
-                fk_cache = _build_fk_cache(table, resolver)
                 unique_handler = UniqueConstraintHandler()
                 task_id = progress.add_task(table_name, total=rows)
-                row_iter = (
-                    generator.generate_row(table, table_classifications, fk_cache, unique_handler)
-                    for _ in range(rows)
+                row_iter = _row_stream(
+                    generator, table, table_classifications, resolver, unique_handler, rows
                 )
                 results.append(
                     inserter.insert_table(

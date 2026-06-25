@@ -69,7 +69,8 @@ class BulkInserter:
     ) -> InsertionResult:
         """Insert all rows for a table in batches, reporting progress.
 
-        A batch that fails is recorded and skipped; remaining batches continue.
+        If a batch fails, it is retried row-by-row so only the genuinely bad
+        rows are skipped; the good rows in that batch still land.
         """
         start = time.perf_counter()
         inserted = 0
@@ -77,13 +78,23 @@ class BulkInserter:
         errors: list[str] = []
         batch: list[dict[str, Any]] = []
 
+        def record_error(message: str) -> None:
+            if message not in errors:
+                errors.append(message)
+
         def flush() -> None:
             nonlocal inserted, skipped
             try:
                 inserted += self.insert_batch(table_name, batch)
-            except InsertionError as exc:
-                skipped += len(batch)
-                errors.append(str(exc))
+            except InsertionError:
+                # Isolate the offending rows: retry individually so the rest of
+                # the batch survives instead of rolling back wholesale.
+                for row in batch:
+                    try:
+                        inserted += self.insert_batch(table_name, [row])
+                    except InsertionError as exc:
+                        skipped += 1
+                        record_error(str(exc))
             if progress_callback is not None:
                 progress_callback(inserted, total_rows)
 
