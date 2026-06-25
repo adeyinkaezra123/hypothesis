@@ -1,5 +1,6 @@
 """Main CLI application entry point."""
 
+import os
 import sys
 from typing import Annotated
 
@@ -73,14 +74,17 @@ def main() -> None:
     This function is called by the 'hypothesis' script defined in pyproject.toml.
     """
     setup_logging_with_redaction(force=True)
-    install_rich_traceback(show_locals=True)
+    # Don't dump frame locals by default: a connection DSN (with password) is
+    # often sitting in them. Opt in with HYPOTHESIS_DEBUG=1 when debugging.
+    show_locals = os.getenv("HYPOTHESIS_DEBUG") == "1"
+    install_rich_traceback(show_locals=show_locals)
     try:
         app()
     except KeyboardInterrupt:
         console.print("\n[yellow]Interrupted by user[/yellow]")
         sys.exit(130)
     except Exception:
-        console.print_exception(show_locals=True)
+        console.print_exception(show_locals=show_locals)
         sys.exit(1)
 
 

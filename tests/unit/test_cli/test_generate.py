@@ -118,3 +118,21 @@ def test_unique_space_exhaustion_stops_gracefully(tmp_path: Path) -> None:
     result = runner.invoke(app, ["generate", url, "--rows", "10", "--seed", "1"])
     assert result.exit_code == 0, result.output
     assert _scalar(url, "SELECT COUNT(*) FROM labels") <= 2
+
+
+def test_missing_driver_message_is_actionable_and_leak_free() -> None:
+    from hypothesis.cli.commands.generate import _missing_driver_message
+
+    message = _missing_driver_message("postgresql://user:secret@localhost/db")
+    assert "psycopg2" in message
+    assert "uv sync --extra postgres" in message
+    assert "secret" not in message  # the DSN / password is never echoed
+
+
+def test_missing_postgres_driver_exits_cleanly() -> None:
+    # psycopg2 isn't installed in the test env: this must be a clean exit, not a crash.
+    result = runner.invoke(
+        app, ["generate", "postgresql://user:secret@localhost/db", "--rows", "5"]
+    )
+    assert result.exit_code == 1
+    assert not isinstance(result.exception, ModuleNotFoundError)
