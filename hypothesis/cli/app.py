@@ -4,19 +4,16 @@ import sys
 from typing import Annotated
 
 import typer
-from rich.console import Console
-from rich.panel import Panel
 from rich.traceback import install as install_rich_traceback
 
 from hypothesis.cli.commands.generate import generate_command
 from hypothesis.cli.commands.inspect import inspect_command
+from hypothesis.cli.theme import APP_NAME, TAGLINE, brand_panel, console
 from hypothesis.utils.logging import setup_logging_with_redaction
-
-console = Console()
 
 app = typer.Typer(
     name="hypothesis",
-    help="Semantic database seeder - generate realistic fake data for PostgreSQL and MySQL",
+    help=TAGLINE,
     add_completion=True,
     rich_markup_mode="rich",
 )
@@ -36,28 +33,18 @@ def common_options(
     ] = False,
 ) -> None:
     """
-    Hypothesis - Semantic Database Seeder
-
-    Generate realistic fake data for your databases automatically.
+    Hypothesis - schema-aware seed data for relational databases.
     """
 
     if version:
         from hypothesis import __version__
 
-        console.print(f"[bold cyan]hypothesis[/bold cyan] version [green]{__version__}[/green]")
+        console.print(f"[app.name]{APP_NAME}[/app.name] [success]{__version__}[/success]")
         raise typer.Exit()
 
-    # If no subcommand is given, show banner + help
     if ctx.invoked_subcommand is None:
         console.print()
-        console.print(
-            Panel.fit(
-                "[bold cyan]hypothesis[/bold cyan]\n"
-                "Semantic database seeder for PostgreSQL and MySQL\n\n"
-                "[dim]Automatically generate realistic fake data based on schema introspection[/dim]",
-                border_style="cyan",
-            )
-        )
+        console.print(brand_panel())
         console.print()
         console.print(ctx.get_help())
         raise typer.Exit()

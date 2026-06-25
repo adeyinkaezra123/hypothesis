@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Annotated, Any
 
 import typer
-from rich.console import Console
 from rich.progress import (
     BarColumn,
     Progress,
@@ -20,6 +19,8 @@ from rich.table import Table as RichTable
 from sqlalchemy import create_engine
 from sqlalchemy.exc import SQLAlchemyError
 
+from hypothesis.cli.output import ClassificationMap
+from hypothesis.cli.theme import console, error_console, error_message, status
 from hypothesis.constraints.foreign_keys import ForeignKeyResolver
 from hypothesis.constraints.unique import UniqueConstraintHandler
 from hypothesis.core.connection_builder import build_connection_string
@@ -29,9 +30,6 @@ from hypothesis.core.inserter import BulkInserter, InsertionResult
 from hypothesis.core.inspector import SchemaInspector
 from hypothesis.core.models import TableSchema
 from hypothesis.mapping.classifier import ColumnClassifier
-
-console = Console()
-error_console = Console(stderr=True)
 
 
 def _resolve_connection(database: str, config: Path | None) -> str:
@@ -52,10 +50,10 @@ def _build_fk_cache(table: TableSchema, resolver: ForeignKeyResolver) -> dict[st
 
 def _make_progress() -> Progress:
     return Progress(
-        TextColumn("[bold blue]{task.description}"),
+        TextColumn("[accent]{task.description}"),
         BarColumn(),
         TaskProgressColumn(),
-        TextColumn("{task.completed}/{task.total} rows"),
+        TextColumn("[muted]{task.completed}/{task.total} rows[/muted]"),
         TimeElapsedColumn(),
         console=console,
     )
@@ -69,10 +67,14 @@ def _progress_callback(progress: Progress, task_id: TaskID) -> Callable[[int, in
 
 
 def _print_summary(results: list[InsertionResult]) -> None:
-    summary = RichTable(title="Generation summary", title_justify="left")
-    summary.add_column("Table", style="cyan")
-    summary.add_column("Inserted", justify="right", style="green")
-    summary.add_column("Skipped", justify="right", style="yellow")
+    summary = RichTable(
+        title="Generation summary",
+        title_justify="left",
+        header_style="table.header",
+    )
+    summary.add_column("Table", style="accent")
+    summary.add_column("Inserted", justify="right", style="success")
+    summary.add_column("Skipped", justify="right", style="warning")
     summary.add_column("Rows/sec", justify="right")
     total = 0
     for result in results:
@@ -84,9 +86,36 @@ def _print_summary(results: list[InsertionResult]) -> None:
             f"{result.rows_per_second:,.0f}",
         )
     console.print(summary)
-    console.print(
-        f"[bold green]Inserted {total:,} rows across {len(results)} table(s).[/bold green]"
+    console.print(status("Inserted", f"{total:,} rows across {len(results)} table(s)"))
+
+
+def _print_plan(
+    tables: dict[str, TableSchema],
+    insertion_order: list[str],
+    classifications: ClassificationMap,
+    *,
+    rows: int,
+    batch_size: int,
+    seed: int | None,
+) -> None:
+    """Render the generation plan before changing database state."""
+    low_confidence = sum(
+        1
+        for table_results in classifications.values()
+        for result in table_results.values()
+        if result.needs_review
     )
+    fk_count = sum(len(table.foreign_keys) for table in tables.values())
+    console.print("[heading]Generation plan[/heading]")
+    console.print(status("Tables", f"{len(tables)} table(s), {fk_count} foreign key(s)"))
+    console.print(status("Rows", f"{rows:,} per table, batch size {batch_size:,}"))
+    console.print(status("Order", " → ".join(insertion_order)))
+    if seed is not None:
+        console.print(status("Seed", str(seed)))
+    if low_confidence:
+        console.print(
+            status("Review", f"{low_confidence} low-confidence column(s)", style="warning")
+        )
 
 
 def generate_command(
@@ -98,9 +127,7 @@ def generate_command(
         list[str] | None,
         typer.Option("--tables", "-t", help="Restrict to specific tables (repeatable)"),
     ] = None,
-    batch_size: Annotated[
-        int, typer.Option("--batch-size", help="Rows per insert batch")
-    ] = 1000,
+    batch_size: Annotated[int, typer.Option("--batch-size", help="Rows per insert batch")] = 1000,
     locale: Annotated[str, typer.Option("--locale", help="Faker locale")] = "en_US",
     seed: Annotated[
         int | None, typer.Option("--seed", help="Random seed for reproducible output")
@@ -111,13 +138,13 @@ def generate_command(
 ) -> None:
     """Generate and insert fake data, respecting foreign keys and unique constraints."""
     if rows < 1:
-        error_console.print("[red]--rows must be at least 1.[/red]")
+        error_console.print(error_message("Invalid row count.", "--rows must be at least 1."))
         raise typer.Exit(code=2)
 
     try:
         engine = create_engine(_resolve_connection(database, config))
     except (HypothesisError, SQLAlchemyError, ValueError) as exc:
-        error_console.print(f"[red]Error:[/red] {exc}")
+        error_console.print(error_message("Could not connect to database.", str(exc)))
         raise typer.Exit(code=1) from exc
 
     try:
@@ -125,7 +152,9 @@ def generate_command(
         inspector.reflect_schema(tables=tables)
         schema_tables = {table.name: table for table in inspector.get_tables()}
         if not schema_tables:
-            console.print("[yellow]No tables found to populate.[/yellow]")
+            console.print(
+                status("No tables found", "database reflected successfully", style="warning")
+            )
             return
         insertion_order = inspector.get_insertion_order()
         classifications = ColumnClassifier().classify_schema(list(schema_tables.values()))
@@ -135,6 +164,15 @@ def generate_command(
         resolver = ForeignKeyResolver(engine)
 
         results: list[InsertionResult] = []
+        _print_plan(
+            schema_tables,
+            insertion_order,
+            classifications,
+            rows=rows,
+            batch_size=batch_size,
+            seed=seed,
+        )
+        console.print()
         with _make_progress() as progress:
             for table_name in insertion_order:
                 table = schema_tables[table_name]
@@ -152,7 +190,7 @@ def generate_command(
                     )
                 )
     except (HypothesisError, SQLAlchemyError) as exc:
-        error_console.print(f"[red]Error:[/red] {exc}")
+        error_console.print(error_message("Could not generate data.", str(exc)))
         raise typer.Exit(code=1) from exc
     finally:
         engine.dispose()
