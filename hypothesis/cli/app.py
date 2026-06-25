@@ -9,6 +9,8 @@ from rich.panel import Panel
 from rich.traceback import install as install_rich_traceback
 
 from hypothesis.cli.commands.inspect import inspect_command
+from hypothesis.config.parser import ConfigParser
+from hypothesis.utils import redaction
 from hypothesis.utils.logging import setup_logging_with_redaction
 
 console = Console()
@@ -65,12 +67,18 @@ def common_options(
 app.command(name="inspect")(inspect_command)
 
 
+def _apply_redaction_settings() -> None:
+    """Apply secret-redaction options from the dotfile config (.hypothesisrc)."""
+    redaction.configure(redaction.settings_from_mapping(ConfigParser().config))
+
+
 def main() -> None:
     """Main entry point for the CLI.
 
     This function is called by the 'hypothesis' script defined in pyproject.toml.
     """
     setup_logging_with_redaction(force=True)
+    _apply_redaction_settings()
     install_rich_traceback(show_locals=True)
     try:
         app()

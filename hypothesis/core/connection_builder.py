@@ -7,6 +7,7 @@ from pathlib import Path
 
 from hypothesis.config.credentials import CredentialManager
 from hypothesis.config.parser import ConfigParser
+from hypothesis.utils.redaction import register_connection_string, register_secret
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +65,7 @@ def build_connection_string(
     # Priority 1: Direct connection string
     if connection:
         logger.debug("Using provided connection string")
+        register_connection_string(connection)
         return connection
 
     # Priority 2: Named database from config
@@ -85,6 +87,7 @@ def build_connection_string(
         # If config has full URL, use it
         if "url" in db_config:
             logger.debug("Using URL from config")
+            register_connection_string(str(db_config["url"]))
             return str(db_config["url"])
 
         # Otherwise extract components from config
@@ -124,6 +127,7 @@ def build_connection_string(
             database=database,
             username=resolved_username,
         )
+    register_secret(resolved_password)
 
     # Build connection string
     dialect_prefix = "postgresql" if dialect in ["postgres", "postgresql"] else "mysql"

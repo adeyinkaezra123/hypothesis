@@ -15,6 +15,7 @@ from hypothesis.core.connection_builder import build_connection_string
 from hypothesis.core.exceptions import HypothesisError
 from hypothesis.core.inspector import SchemaInspector
 from hypothesis.mapping.classifier import ColumnClassifier
+from hypothesis.utils.redaction import register_connection_string
 
 console = Console()
 error_console = Console(stderr=True)
@@ -29,6 +30,7 @@ def _resolve_connection(database: str, config: Path | None) -> str:
     is looked up as a named entry in a config file.
     """
     if "://" in database:
+        register_connection_string(database)
         return database
     return build_connection_string(database_name=database, config_file=config)
 
