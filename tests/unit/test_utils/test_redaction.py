@@ -70,6 +70,13 @@ def test_connection_string_registration_scrubs_password() -> None:
     assert _SECRET not in _redact("dsn=" + dsn)
 
 
+def test_connection_string_registration_scrubs_url_decoded_password() -> None:
+    encoded = "p%40ssword"
+    decoded = "p@ssword"
+    register_connection_string(_dsn(encoded))
+    assert decoded not in _redact("driver decoded password: " + decoded)
+
+
 def test_connection_string_with_common_password_falls_back_to_pattern() -> None:
     # "postgres" is skipped for exact registration, but the pattern still masks it.
     register_connection_string(_dsn("postgres"))
@@ -147,6 +154,24 @@ def test_settings_from_mapping_parses_redaction_section() -> None:
     assert settings.enabled is False
     assert settings.extra_keys == ["k"]
     assert settings.extra_patterns == ["p"]
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("false", False),
+        ("0", False),
+        ("no", False),
+        ("off", False),
+        ("true", True),
+        ("1", True),
+        ("yes", True),
+        ("on", True),
+    ],
+)
+def test_settings_from_mapping_parses_string_booleans(raw: str, expected: bool) -> None:
+    settings = settings_from_mapping({"redaction": {"enabled": raw}})
+    assert settings.enabled is expected
 
 
 def test_settings_from_mapping_defaults_when_absent() -> None:

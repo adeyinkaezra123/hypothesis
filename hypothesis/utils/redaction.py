@@ -21,6 +21,9 @@ import logging
 import re
 from dataclasses import dataclass, field
 from typing import Any
+from urllib.parse import unquote
+
+from sqlalchemy.engine.url import make_url
 
 # Don't register very short values (too collision-prone), and never register
 # common tokens that are substrings of harmless text (e.g. "postgres" would
@@ -44,7 +47,10 @@ _COMMON_VALUES = {
 }
 _PLACEHOLDER = "***"
 
-_DEFAULT_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+_DEFAULT_LABELED_SECRET_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    # These are intentionally narrow, labeled fallback patterns. They are not a
+    # generic secret detector; exact-value registration is the primary redaction
+    # mechanism for secrets the application actually receives.
     # Connection strings: user:<password>@host -> user:***@host
     (re.compile(r"://([^:]+):([^@\s]+)@"), r"://\1:***@"),
     # password=value (optionally quoted)
@@ -93,14 +99,16 @@ class Redactor:
     def __init__(self) -> None:
         self.enabled = True
         self._exact: set[str] = set()
-        self._patterns: list[tuple[re.Pattern[str], str]] = list(_DEFAULT_PATTERNS)
+        self._patterns: list[tuple[re.Pattern[str], str]] = list(
+            _DEFAULT_LABELED_SECRET_PATTERNS
+        )
         self._keys: set[str] = set(_DEFAULT_SENSITIVE_KEYS)
 
     def reset(self) -> None:
         """Restore defaults and forget registered secrets (used by tests/startup)."""
         self.enabled = True
         self._exact.clear()
-        self._patterns = list(_DEFAULT_PATTERNS)
+        self._patterns = list(_DEFAULT_LABELED_SECRET_PATTERNS)
         self._keys = set(_DEFAULT_SENSITIVE_KEYS)
 
     def register_secret(self, secret: str | None) -> None:
@@ -118,7 +126,13 @@ class Redactor:
             return
         match = _CONN_PASSWORD_RE.search(url)
         if match:
-            self.register_secret(match.group(1))
+            raw_password = match.group(1)
+            self.register_secret(raw_password)
+            self.register_secret(unquote(raw_password))
+        try:
+            self.register_secret(make_url(url).password)
+        except Exception:
+            return
 
     def add_sensitive_keys(self, keys: list[str]) -> None:
         self._keys.update(key.lower() for key in keys)
@@ -188,13 +202,30 @@ def reset() -> None:
     _redactor.reset()
 
 
+def _parse_bool(value: Any, *, default: bool) -> bool:
+    """Parse config booleans that may arrive as strings after interpolation."""
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return value != 0
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"1", "true", "yes", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "off"}:
+            return False
+    return bool(value)
+
+
 def settings_from_mapping(data: dict[str, Any]) -> RedactionSettings:
     """Build :class:`RedactionSettings` from a parsed config mapping's ``redaction`` section."""
     section = data.get("redaction") if isinstance(data, dict) else None
     if not isinstance(section, dict):
         return RedactionSettings()
     return RedactionSettings(
-        enabled=bool(section.get("enabled", True)),
+        enabled=_parse_bool(section.get("enabled"), default=True),
         extra_keys=[str(key) for key in section.get("extra_keys") or []],
         extra_patterns=[str(pattern) for pattern in section.get("extra_patterns") or []],
     )
