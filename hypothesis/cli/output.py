@@ -24,7 +24,7 @@ from hypothesis.mapping.types import ClassificationResult
 ClassificationMap = dict[str, dict[str, ClassificationResult]]
 
 
-def _constraint_flags(col: ColumnSchema) -> str:
+def constraint_flags(col: ColumnSchema) -> str:
     """Compact human-readable constraint summary for a column."""
     flags: list[str] = []
     if col.is_primary_key:
@@ -40,6 +40,9 @@ def _constraint_flags(col: ColumnSchema) -> str:
     if col.enum_values:
         flags.append(f"enum({len(col.enum_values)})")
     return ", ".join(flags)
+
+
+_constraint_flags = constraint_flags
 
 
 def _qualified_name(table: TableSchema) -> str:
@@ -82,7 +85,7 @@ def render_table(
                 col.name,
                 col.sql_type,
                 "✓" if col.nullable else "—",
-                _constraint_flags(col),
+                constraint_flags(col),
             ]
             if show_semantic:
                 cells.append(_semantic_cell(results.get(col.name), markup=True))
@@ -172,7 +175,7 @@ def render_markdown(
             lines.append("| --- | --- | --- | --- |")
         for col in table.columns:
             nullable = "yes" if col.nullable else "no"
-            row = f"| {col.name} | {col.sql_type} | {nullable} | {_constraint_flags(col)} |"
+            row = f"| {col.name} | {col.sql_type} | {nullable} | {constraint_flags(col)} |"
             if show_semantic:
                 row += f" {_semantic_cell(results.get(col.name), markup=False)} |"
             lines.append(row)
