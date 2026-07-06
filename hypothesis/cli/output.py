@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from rich import box
 from rich.console import Console
 from rich.table import Table
 
@@ -78,7 +79,17 @@ def render_table(
     show_semantic = classifications is not None
     for table in tables:
         results = classifications.get(table.name, {}) if classifications else {}
-        rich_table = Table(title=_qualified_name(table), title_justify="left")
+        # Quiet chrome: a single header rule, no cell cage, dim borders. The
+        # data carries the colour; the frame should not compete with it.
+        rich_table = Table(
+            title=_qualified_name(table),
+            title_justify="left",
+            title_style="bold",
+            box=box.SIMPLE_HEAD,
+            border_style="bright_black",
+            pad_edge=False,
+            show_edge=False,
+        )
         rich_table.add_column("Column", style="cyan", no_wrap=True)
         rich_table.add_column("Type", style="green")
         rich_table.add_column("Null", justify="center")
@@ -99,6 +110,7 @@ def render_table(
                 cells.append(_confidence_cell(result))
             rich_table.add_row(*cells)
         console.print(rich_table)
+        console.print()
 
         if verbose and table.foreign_keys:
             console.print("  [dim]Foreign keys:[/dim]")
