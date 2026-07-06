@@ -367,6 +367,7 @@ dependencies = [
     { name = "pyyaml" },
     { name = "rich" },
     { name = "sqlalchemy" },
+    { name = "textual" },
     { name = "typer" },
 ]
 
@@ -386,6 +387,7 @@ dev = [
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-mock" },
+    { name = "pytest-textual-snapshot" },
     { name = "ruff" },
     { name = "types-pyyaml" },
 ]
@@ -399,6 +401,7 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0.0" },
     { name = "rich", specifier = ">=13.0.0" },
     { name = "sqlalchemy", specifier = ">=2.0.0" },
+    { name = "textual", specifier = ">=8.2.7" },
     { name = "typer", specifier = ">=0.12.0" },
 ]
 provides-extras = ["postgres", "mysql"]
@@ -411,6 +414,7 @@ dev = [
     { name = "pytest", specifier = ">=8.0.0" },
     { name = "pytest-cov", specifier = ">=4.1.0" },
     { name = "pytest-mock", specifier = ">=3.15.1" },
+    { name = "pytest-textual-snapshot", specifier = ">=1.0.0" },
     { name = "ruff", specifier = ">=0.3.0" },
     { name = "types-pyyaml" },
 ]
@@ -437,6 +441,18 @@ wheels = [
 ]
 
 [[package]]
+name = "linkify-it-py"
+version = "2.1.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "uc-micro-py" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/2e/c9/06ea13676ef354f0af6169587ae292d3e2406e212876a413bf9eece4eb23/linkify_it_py-2.1.0.tar.gz", hash = "sha256:43360231720999c10e9328dc3691160e27a718e280673d444c38d7d3aaa3b98b", size = 29158, upload-time = "2026-03-01T07:48:47.683Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b4/de/88b3be5c31b22333b3ca2f6ff1de4e863d8fe45aaea7485f591970ec1d3e/linkify_it_py-2.1.0-py3-none-any.whl", hash = "sha256:0d252c1594ecba2ecedc444053db5d3a9b7ec1b0dd929c8f1d74dce89f86c05e", size = 19878, upload-time = "2026-03-01T07:48:46.098Z" },
+]
+
+[[package]]
 name = "markdown-it-py"
 version = "4.0.0"
 source = { registry = "https://pypi.org/simple" }
@@ -446,6 +462,11 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/5b/f5/4ec618ed16cc4f8fb3b701563655a69816155e79e24a17b651541804721d/markdown_it_py-4.0.0.tar.gz", hash = "sha256:cb0a2b4aa34f932c007117b194e945bd74e0ec24133ceb5bac59009cda1cb9f3", size = 73070, upload-time = "2025-08-11T12:57:52.854Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/94/54/e7d793b573f298e1c9013b8c4dade17d481164aa517d1d7148619c2cedbf/markdown_it_py-4.0.0-py3-none-any.whl", hash = "sha256:87327c59b172c5011896038353a81343b6754500a08cd7a4973bb48c6d578147", size = 87321, upload-time = "2025-08-11T12:57:51.923Z" },
+]
+
+[package.optional-dependencies]
+linkify = [
+    { name = "linkify-it-py" },
 ]
 
 [[package]]
@@ -520,6 +541,18 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/fb/df/5bd7a48c256faecd1d36edc13133e51397e41b73bb77e1a69deab746ebac/markupsafe-3.0.3-cp314-cp314t-win32.whl", hash = "sha256:915c04ba3851909ce68ccc2b8e2cd691618c4dc4c4232fb7982bca3f41fd8c3d", size = 14819, upload-time = "2025-09-27T18:37:26.285Z" },
     { url = "https://files.pythonhosted.org/packages/1a/8a/0402ba61a2f16038b48b39bccca271134be00c5c9f0f623208399333c448/markupsafe-3.0.3-cp314-cp314t-win_amd64.whl", hash = "sha256:4faffd047e07c38848ce017e8725090413cd80cbc23d86e55c587bf979e579c9", size = 15426, upload-time = "2025-09-27T18:37:27.316Z" },
     { url = "https://files.pythonhosted.org/packages/70/bc/6f1c2f612465f5fa89b95bead1f44dcb607670fd42891d8fdcd5d039f4f4/markupsafe-3.0.3-cp314-cp314t-win_arm64.whl", hash = "sha256:32001d6a8fc98c8cb5c947787c5d08b0a50663d139f1305bac5885d98d9b40fa", size = 14146, upload-time = "2025-09-27T18:37:28.327Z" },
+]
+
+[[package]]
+name = "mdit-py-plugins"
+version = "0.6.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "markdown-it-py" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/59/fc/f8d0863f8862f25602c0404d75568e89fb6b4109804645e5cdfb1be5cf56/mdit_py_plugins-0.6.1.tar.gz", hash = "sha256:a2bca0f039f39dbd35fb74ae1b5f998608c437463371f0ff7f49a19a17a114d0", size = 56114, upload-time = "2026-05-13T09:03:38.91Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a5/69/6da5581c6a7fede7dc261bf4e67d6adca4196f176b43288b55b3db395b6e/mdit_py_plugins-0.6.1-py3-none-any.whl", hash = "sha256:214c82fb2ac524472ab6a5bcab1de80f73b50443e187f401bfd77efbc7c6481d", size = 66663, upload-time = "2026-05-13T09:03:37.76Z" },
 ]
 
 [[package]]
@@ -851,6 +884,22 @@ wheels = [
 ]
 
 [[package]]
+name = "pytest-textual-snapshot"
+version = "1.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "jinja2" },
+    { name = "pytest" },
+    { name = "rich" },
+    { name = "syrupy" },
+    { name = "textual" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/8b/75/2ef17ae52fa5bc848ff2d1d7bc317a702cbd6d7ad733ca991b9f899dbbae/pytest_textual_snapshot-1.0.0.tar.gz", hash = "sha256:065217055ed833b8a16f2320a0613f39a0154e8d9fee63535f29f32c6414b9d7", size = 11071, upload-time = "2024-07-22T15:17:44.629Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/70/2e/4bf16ed78b382b3d7c1e545475ec8cf04346870be662815540faf8f16e8c/pytest_textual_snapshot-1.0.0-py3-none-any.whl", hash = "sha256:dd3a421491a6b1987ee7b4336d7f65299524924d2b0a297e69733b73b01570e1", size = 11171, upload-time = "2024-07-22T15:17:43.167Z" },
+]
+
+[[package]]
 name = "pytokens"
 version = "0.3.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1012,12 +1061,41 @@ wheels = [
 ]
 
 [[package]]
+name = "syrupy"
+version = "5.3.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pytest" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/81/17/95753634cd02a892cbc74d8df9c15f5ad053885a913eb11aa6061f278344/syrupy-5.3.4.tar.gz", hash = "sha256:10f192655a2d42473ad5772653e64b281f6823fe5e30458d92f8ca8e882884c1", size = 87078, upload-time = "2026-06-26T10:55:42.522Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/00/7a/254f95860cebb6d51ddb3e815ee30085e8c8a3ba6df1f44ef4605b385621/syrupy-5.3.4-py3-none-any.whl", hash = "sha256:409348aa20afc4b7dab7c965331de0cd79ab46977877fb189014ce9294e947e5", size = 53103, upload-time = "2026-06-26T10:55:41.007Z" },
+]
+
+[[package]]
 name = "termcolor"
 version = "3.3.0"
 source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/46/79/cf31d7a93a8fdc6aa0fbb665be84426a8c5a557d9240b6239e9e11e35fc5/termcolor-3.3.0.tar.gz", hash = "sha256:348871ca648ec6a9a983a13ab626c0acce02f515b9e1983332b17af7979521c5", size = 14434, upload-time = "2025-12-29T12:55:21.882Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/33/d1/8bb87d21e9aeb323cc03034f5eaf2c8f69841e40e4853c2627edf8111ed3/termcolor-3.3.0-py3-none-any.whl", hash = "sha256:cf642efadaf0a8ebbbf4bc7a31cec2f9b5f21a9f726f4ccbb08192c9c26f43a5", size = 7734, upload-time = "2025-12-29T12:55:20.718Z" },
+]
+
+[[package]]
+name = "textual"
+version = "8.2.7"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "markdown-it-py", extra = ["linkify"] },
+    { name = "mdit-py-plugins" },
+    { name = "platformdirs" },
+    { name = "pygments" },
+    { name = "rich" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/9b/7a/c519db0aba5024f86e71e9631810bfdd6866ed2c8695bd7fa34b90e7ef59/textual-8.2.7.tar.gz", hash = "sha256:658f568ff81e30ed43890c3e07520390e5cf1b4763822006e060656b0a88f105", size = 1859249, upload-time = "2026-05-19T10:52:49.531Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a8/f5/c1e18bc0707300a0e90204343abbf7d7acd6fb7ebe03a6d4893b99a234b8/textual-8.2.7-py3-none-any.whl", hash = "sha256:4caaa13a90bc4cf9c6c862c067ccd34fe84e9c161710a2a907a8026313b6bd73", size = 731129, upload-time = "2026-05-19T10:52:51.773Z" },
 ]
 
 [[package]]
@@ -1130,6 +1208,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/95/32/1a225d6164441be760d75c2c42e2780dc0873fe382da3e98a2e1e48361e5/tzdata-2025.2.tar.gz", hash = "sha256:b60a638fcc0daffadf82fe0f57e53d06bdec2f36c4df66280ae79bce6bd6f2b9", size = 196380, upload-time = "2025-03-23T13:54:43.652Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/5c/23/c7abc0ca0a1526a0774eca151daeb8de62ec457e77262b66b359c3c7679e/tzdata-2025.2-py2.py3-none-any.whl", hash = "sha256:1a403fada01ff9221ca8044d701868fa132215d84beb92242d9acd2147f667a8", size = 347839, upload-time = "2025-03-23T13:54:41.845Z" },
+]
+
+[[package]]
+name = "uc-micro-py"
+version = "2.0.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/78/67/9a363818028526e2d4579334460df777115bdec1bb77c08f9db88f6389f2/uc_micro_py-2.0.0.tar.gz", hash = "sha256:c53691e495c8db60e16ffc4861a35469b0ba0821fe409a8a7a0a71864d33a811", size = 6611, upload-time = "2026-03-01T06:31:27.526Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/61/73/d21edf5b204d1467e06500080a50f79d49ef2b997c79123a536d4a17d97c/uc_micro_py-2.0.0-py3-none-any.whl", hash = "sha256:3603a3859af53e5a39bc7677713c78ea6589ff188d70f4fee165db88e22b242c", size = 6383, upload-time = "2026-03-01T06:31:26.257Z" },
 ]
 
 [[package]]
