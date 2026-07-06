@@ -17,12 +17,11 @@ from rich.progress import (
     TimeElapsedColumn,
 )
 from rich.table import Table as RichTable
-from sqlalchemy import Engine, create_engine
 from sqlalchemy.exc import SQLAlchemyError
 
+from hypothesis.cli.commands._connect import open_engine
 from hypothesis.constraints.foreign_keys import ForeignKeyResolver
 from hypothesis.constraints.unique import UniqueConstraintHandler
-from hypothesis.core.connection_builder import build_connection_string
 from hypothesis.core.exceptions import HypothesisError, UniqueConstraintError
 from hypothesis.core.generator import DataGenerator
 from hypothesis.core.inserter import BulkInserter, InsertionResult
@@ -33,49 +32,6 @@ from hypothesis.mapping.types import ClassificationResult
 
 console = Console()
 error_console = Console(stderr=True)
-
-
-def _resolve_connection(database: str, config: Path | None) -> str:
-    if "://" in database:
-        return database
-    return build_connection_string(database_name=database, config_file=config)
-
-
-def _missing_driver_message(connection_string: str) -> str:
-    """Actionable message for a missing DB driver (never includes the DSN)."""
-    scheme = connection_string.split("://", 1)[0].lower()
-    if "postgres" in scheme:
-        return (
-            "[red]Error:[/red] the PostgreSQL driver (psycopg2) is not installed.\n"
-            "[dim]Install it with:[/dim] uv sync --extra postgres"
-        )
-    if "mysql" in scheme:
-        return (
-            "[red]Error:[/red] the MySQL driver (PyMySQL) is not installed.\n"
-            "[dim]Install it with:[/dim] uv sync --extra mysql"
-        )
-    return "[red]Error:[/red] the required database driver is not installed."
-
-
-def _open_engine(database: str, config: Path | None) -> Engine:
-    """Resolve the connection and create an engine, with friendly error messages.
-
-    Exits cleanly (no traceback) on a bad connection string or a missing driver.
-    """
-    try:
-        connection_string = _resolve_connection(database, config)
-    except (HypothesisError, ValueError) as exc:
-        error_console.print(f"[red]Error:[/red] {exc}")
-        raise typer.Exit(code=1) from exc
-
-    try:
-        return create_engine(connection_string)
-    except ImportError as exc:
-        error_console.print(_missing_driver_message(connection_string))
-        raise typer.Exit(code=1) from exc
-    except (SQLAlchemyError, ValueError) as exc:
-        error_console.print(f"[red]Error:[/red] {exc}")
-        raise typer.Exit(code=1) from exc
 
 
 def _row_stream(
@@ -162,7 +118,7 @@ def generate_command(
         error_console.print("[red]--rows must be at least 1.[/red]")
         raise typer.Exit(code=2)
 
-    engine = _open_engine(database, config)
+    engine = open_engine(database, config)
 
     try:
         inspector = SchemaInspector(engine)
