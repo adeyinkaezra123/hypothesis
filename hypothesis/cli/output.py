@@ -7,7 +7,9 @@ the table renderer prints to a Rich console.
 
 Each renderer optionally takes ``classifications`` (table name -> column name ->
 :class:`ClassificationResult`); when present, columns show their inferred
-semantic type with a confidence indicator (✓ high, ⚠ needs review).
+semantic type and a colour-coded confidence (✓ high, ⚠ needs review).
+:func:`render_explanation` prints the full classification card for one column
+(backing ``inspect --explain``).
 """
 
 from __future__ import annotations
@@ -24,7 +26,7 @@ from hypothesis.mapping.types import ClassificationResult
 ClassificationMap = dict[str, dict[str, ClassificationResult]]
 
 
-def _constraint_flags(col: ColumnSchema) -> str:
+def constraint_flags(col: ColumnSchema) -> str:
     """Compact human-readable constraint summary for a column."""
     flags: list[str] = []
     if col.is_primary_key:
@@ -47,15 +49,21 @@ def _qualified_name(table: TableSchema) -> str:
     return f"{name} (view)" if table.is_view else name
 
 
-def _semantic_cell(result: ClassificationResult | None, *, markup: bool) -> str:
-    """Inferred semantic type plus a confidence indicator (✓ high / ⚠ review)."""
+def _semantic_cell(result: ClassificationResult | None) -> str:
+    """Semantic type, review indicator, and confidence for Markdown cells."""
     if result is None:
         return ""
-    if markup:
-        indicator = "[green]✓[/green]" if not result.needs_review else "[yellow]⚠[/yellow]"
-    else:
-        indicator = "✓" if not result.needs_review else "⚠"
-    return f"{result.semantic_type.value} {indicator}"
+    indicator = "✓" if not result.needs_review else "⚠"
+    return f"{result.semantic_type.value} {indicator} {result.confidence:.2f}"
+
+
+def _confidence_cell(result: ClassificationResult | None) -> str:
+    """Colour-coded confidence with a review indicator for the table renderer."""
+    if result is None:
+        return ""
+    if result.needs_review:
+        return f"[yellow]{result.confidence:.2f} ⚠[/yellow]"
+    return f"[green]{result.confidence:.2f} ✓[/green]"
 
 
 def render_table(
@@ -77,15 +85,18 @@ def render_table(
         rich_table.add_column("Constraints", style="yellow")
         if show_semantic:
             rich_table.add_column("Semantic", style="magenta")
+            rich_table.add_column("Confidence")
         for col in table.columns:
             cells = [
                 col.name,
                 col.sql_type,
                 "✓" if col.nullable else "—",
-                _constraint_flags(col),
+                constraint_flags(col),
             ]
             if show_semantic:
-                cells.append(_semantic_cell(results.get(col.name), markup=True))
+                result = results.get(col.name)
+                cells.append(result.semantic_type.value if result else "")
+                cells.append(_confidence_cell(result))
             rich_table.add_row(*cells)
         console.print(rich_table)
 
@@ -96,6 +107,50 @@ def render_table(
                 console.print(
                     f"    {fk.column} → {fk.referenced_table}.{fk.referenced_column}{marker}"
                 )
+
+
+def render_explanation(
+    table: TableSchema,
+    column: ColumnSchema,
+    classification: ClassificationResult | None,
+    *,
+    console: Console | None = None,
+) -> None:
+    """Print the full classification card for one column.
+
+    Surfaces what the summary table has no room for: the matched layer and
+    pattern, the Faker provider, and the classifier's reasoning. Plain-friendly:
+    Rich drops the colour when output is piped.
+    """
+    console = console or Console()
+
+    def field(label: str, value: str) -> None:
+        console.print(f"[bold blue]{label:<12}[/bold blue] {value}")
+
+    console.print(f"[bold cyan]{_qualified_name(table)}.{column.name}[/bold cyan]")
+    nullability = "nullable" if column.nullable else "not null"
+    console.print(f"[green]{column.sql_type}[/green] [dim]·[/dim] {nullability}")
+    console.print()
+    flags = constraint_flags(column)
+    if flags:
+        field("Constraints", flags)
+    if classification is None:
+        console.print("[dim]No classification available for this column.[/dim]")
+        return
+    field("Semantic", classification.semantic_type.value)
+    if classification.needs_review:
+        field("Confidence", f"{classification.confidence:.2f} [yellow]⚠ needs review[/yellow]")
+    else:
+        field("Confidence", f"{classification.confidence:.2f} [green]✓[/green]")
+    field("Match layer", str(classification.matched_layer))
+    if classification.matched_pattern:
+        field("Pattern", classification.matched_pattern)
+    provider = classification.faker_provider
+    if classification.faker_kwargs:
+        provider += f" {classification.faker_kwargs}"
+    field("Faker", provider)
+    if classification.reasoning:
+        field("Reasoning", classification.reasoning)
 
 
 def _column_to_dict(
@@ -172,9 +227,9 @@ def render_markdown(
             lines.append("| --- | --- | --- | --- |")
         for col in table.columns:
             nullable = "yes" if col.nullable else "no"
-            row = f"| {col.name} | {col.sql_type} | {nullable} | {_constraint_flags(col)} |"
+            row = f"| {col.name} | {col.sql_type} | {nullable} | {constraint_flags(col)} |"
             if show_semantic:
-                row += f" {_semantic_cell(results.get(col.name), markup=False)} |"
+                row += f" {_semantic_cell(results.get(col.name))} |"
             lines.append(row)
         if table.foreign_keys:
             lines.append("")
