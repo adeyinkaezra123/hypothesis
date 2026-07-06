@@ -28,7 +28,8 @@ def db_url(tmp_path: Path) -> str:
                 "CREATE TABLE posts ("
                 "id INTEGER PRIMARY KEY, "
                 "user_id INTEGER NOT NULL REFERENCES users(id), "
-                "title VARCHAR(200))"
+                "title VARCHAR(200), "
+                "wibble VARCHAR(50))"
             )
         )
     engine.dispose()
@@ -95,3 +96,45 @@ def test_json_includes_semantic_classification(db_url: str) -> None:
     assert email["semantic_type"] == "email"
     assert "confidence" in email
     assert email["needs_review"] is False
+
+
+def test_table_output_shows_confidence_and_flags_review(db_url: str) -> None:
+    # "wibble" matches no semantic pattern, so it must surface as needing review.
+    result = runner.invoke(app, ["inspect", db_url])
+    assert result.exit_code == 0, result.output
+    assert "Confidence" in result.output
+    assert "⚠" in result.output
+    assert "need review" in result.output
+    assert "--explain" in result.output  # the epilogue points at the reasoning card
+
+
+def test_explain_prints_classification_card(db_url: str) -> None:
+    result = runner.invoke(app, ["inspect", db_url, "--explain", "users.email"])
+    assert result.exit_code == 0, result.output
+    assert "users.email" in result.output
+    assert "Semantic" in result.output
+    assert "Confidence" in result.output
+    assert "Faker" in result.output
+
+
+def test_explain_low_confidence_column_shows_review_state(db_url: str) -> None:
+    result = runner.invoke(app, ["inspect", db_url, "--explain", "posts.wibble"])
+    assert result.exit_code == 0, result.output
+    assert "needs review" in result.output
+
+
+def test_explain_without_dot_exits_2(db_url: str) -> None:
+    result = runner.invoke(app, ["inspect", db_url, "--explain", "wibble"])
+    assert result.exit_code == 2
+
+
+def test_explain_unknown_column_exits_1(db_url: str) -> None:
+    result = runner.invoke(app, ["inspect", db_url, "--explain", "posts.nope"])
+    assert result.exit_code == 1
+
+
+def test_missing_postgres_driver_exits_cleanly() -> None:
+    # psycopg2 isn't installed in the test env: this must be a clean exit, not a crash.
+    result = runner.invoke(app, ["inspect", "postgresql://user:secret@localhost/db"])
+    assert result.exit_code == 1
+    assert not isinstance(result.exception, ModuleNotFoundError)

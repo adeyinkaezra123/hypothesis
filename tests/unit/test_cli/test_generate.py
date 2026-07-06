@@ -121,9 +121,9 @@ def test_unique_space_exhaustion_stops_gracefully(tmp_path: Path) -> None:
 
 
 def test_missing_driver_message_is_actionable_and_leak_free() -> None:
-    from hypothesis.cli.commands.generate import _missing_driver_message
+    from hypothesis.cli.commands._connect import missing_driver_message
 
-    message = _missing_driver_message("postgresql://user:secret@localhost/db")
+    message = missing_driver_message("postgresql://user:secret@localhost/db")
     assert "psycopg2" in message
     assert "uv sync --extra postgres" in message
     assert "secret" not in message  # the DSN / password is never echoed
