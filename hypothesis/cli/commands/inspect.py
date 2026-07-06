@@ -95,7 +95,11 @@ def inspect_command(
 
     try:
         connection_string = _resolve_connection(database, config)
-        result = inspect_database(connection_string, tables=tables)
+        # Reflection blocks; show feedback on stderr so a large schema doesn't
+        # look like a frozen terminal. Rich no-ops the spinner off a TTY, so
+        # piped --format json/markdown output stays clean.
+        with error_console.status("Reflecting schema…"):
+            result = inspect_database(connection_string, tables=tables)
     except (HypothesisError, SQLAlchemyError, ValueError) as exc:
         error_console.print(f"[red]Error:[/red] {exc}")
         raise typer.Exit(code=1) from exc
